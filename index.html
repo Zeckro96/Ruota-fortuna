@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#121826" />
+  <title>Ruota Cinnabar Lab</title>
+
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="icon" href="pittogramma-favicon.jpg" />
+  <link rel="shortcut icon" href="pittogramma-favicon.jpg" />
+
+  <style>
+    :root { --bg:#0b0f14; --panel:#121826; --text:#e8eef6; --muted:#9fb0c3; --accent:#6aa6ff; }
+    *{ box-sizing:border-box; }
+    body{ margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif; background:var(--bg); color:var(--text); }
+    .safe { padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+
+    .app{
+      max-width: 980px;
+      margin: 0 auto;
+      display: grid;
+      gap: 14px;
+    }
+
+    /* Mobile-first: ruota sopra, controlli sotto. Su desktop affianca */
+    @media (min-width: 900px){
+      .app{
+        grid-template-columns: 520px 1fr;
+        align-items: start;
+      }
+    }
+
+    .card{ background:var(--panel); border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:14px; }
+    h1{ margin:0 0 10px; font-size:16px; letter-spacing:.2px; }
+    .muted{ color:var(--muted); font-size:12px; line-height:1.35; }
+
+    .wheelWrap{ position:relative; }
+    .pointer{
+      position:absolute; left:50%; top:6px; transform: translateX(-50%);
+      width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-top:22px solid var(--accent);
+      filter: drop-shadow(0 6px 10px rgba(0,0,0,.45));
+      z-index:2;
+    }
+    canvas{ width:100%; height:auto; display:block; }
+
+    .btnRow{ display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+    button{
+      appearance:none;
+      border:0;
+      border-radius:14px;
+      padding:12px 14px;
+      font-weight:800;
+      cursor:pointer;
+      background:linear-gradient(180deg, rgba(106,166,255,.95), rgba(106,166,255,.65));
+      color:#06101f;
+      min-height:44px;
+      flex: 1 1 auto;
+    }
+    button.secondary{
+      background:transparent;
+      color:var(--text);
+      border:1px solid rgba(255,255,255,.18);
+      font-weight:700;
+      flex: 0 0 auto;
+    }
+    button:disabled{ opacity:.45; cursor:not-allowed; }
+
+    .result{
+      margin-top:10px;
+      font-size:18px;
+      font-weight:900;
+      padding:10px 12px;
+      border-radius:14px;
+      background:rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.10);
+      display:none;
+    }
+
+    .kpi{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+    .kpi .box{ padding:10px; border-radius:14px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); }
+    .kpi .box b{ display:block; font-size:11px; color:var(--muted); margin-bottom:6px; }
+    .kpi .box span{ font-size:14px; font-weight:800; }
+
+    /* Public mode: solo ruota + gira */
+    .publicOnly { display:block; }
+    .staffOnly { display:none; }
+    body.staffUnlocked .staffOnly { display:block; }
+    body.staffUnlocked .publicOnly { display:none; }
+
+    textarea{
+      width:100%;
+      min-height: 220px;
+      resize: vertical;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.12);
+      background:#0e1523;
+      color:var(--text);
+      padding:10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size:13px;
+    }
+
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+    input[type="password"]{
+      flex:1 1 220px;
+      min-height:44px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.12);
+      background:#0e1523;
+      color:var(--text);
+      padding:10px 12px;
+      font-size:14px;
+    }
+    .pill{
+      display:inline-block;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.04);
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    .topBar{
+      display:flex; justify-content:space-between; align-items:center; gap:10px;
+      margin-bottom:10px;
+    }
+    .smallBtn{
+      padding:10px 12px;
+      border-radius:12px;
+      min-height:40px;
+    }
+  </style>
+</head>
+<body>
+  <div class="safe">
+    <div class="app">
+      <!-- PUBLIC / PLAYER VIEW -->
+      <div class="card">
+        <div class="topBar">
+          <h1>Ruota Cinnabar Lab</h1>
+          <button class="secondary smallBtn" id="staffBtn" title="Area staff">Staff</button>
+        </div>
+
+        <div class="wheelWrap">
+          <div class="pointer" aria-hidden="true"></div>
+          <canvas id="wheel" width="900" height="900" aria-label="ruota"></canvas>
+        </div>
+
+        <div class="btnRow">
+          <button id="spinBtn">GIRA</button>
+          <button class="secondary" id="resetBtn">Reset</button>
+        </div>
+
+        <div id="result" class="result"></div>
+
+        <div class="kpi">
+          <div class="box"><b>Settori (visivi)</b><span id="nSlices">–</span></div>
+          <div class="box"><b>Somma pesi</b><span id="sumWeights">–</span></div>
+        </div>
+
+        <p class="muted" style="margin:10px 0 0">
+          Settori tutti uguali. Probabilità gestita dai pesi (weight).
+        </p>
+      </div>
+
+      <!-- STAFF PANEL (locked by default) -->
+      <div class="card">
+        <div class="publicOnly">
+          <h1>Area staff (bloccata)</h1>
+          <p class="muted">
+            Inserisci la password per modificare i pesi. Per eventi live è consigliato lasciare la ruota in modalità pubblica.
+          </p>
+          <div class="row">
+            <input id="pw" type="password" placeholder="Password staff" autocomplete="current-password" />
+            <button class="secondary" id="unlockBtn">Sblocca</button>
+          </div>
+          <p class="muted">
+            Nota: la protezione è lato-client (serve per evitare modifiche accidentali, non per sicurezza “militare”).
+          </p>
+          <p class="muted"><span class="pill" id="installHint">Suggerimento: puoi installarla come app (PWA).</span></p>
+        </div>
+
+        <div class="staffOnly">
+          <div class="topBar">
+            <h1>Area staff</h1>
+            <button class="secondary smallBtn" id="lockBtn">Blocca</button>
+          </div>
+
+          <p class="muted">
+            Formato: <code>Etichetta | peso</code> (peso &gt; 0). Supporta decimali con virgola o punto.
+          </p>
+
+          <textarea id="cfg"></textarea>
+
+          <div class="row">
+            <button class="secondary" id="applyBtn">Applica</button>
+            <button class="secondary" id="presetBtn">Ripristina pesi</button>
+            <button class="secondary" id="copyLinkBtn">Copia link condivisibile</button>
+          </div>
+
+          <p class="muted">
+            Consiglio operativo: se usi “Respin”, considera se farlo girare subito oppure dare un gettone “Respin” da usare quando vuoi.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/**
+ * PWA + Ruota: settori uguali, estrazione pesata.
+ * Staff mode protetta da password (hash SHA-256).
+ */
+
+// ====== CONFIG: cambia qui la password staff (hash SHA-256) ======
+// Se vuoi cambiarla: calcola SHA-256 della nuova password e incollalo qui.
+const STAFF_PASSWORD_SHA256_HEX = "6e965884ed589f7e22ac394159e67dcaa1243ebc17454efb3b2654aca5c3c725";
+
+// ====== Default preset (tuoi pesi) ======
+const PRESET_TEXT = [
+  "Bustina espansione | 4,5",
+  "Promo foil lega | 20",
+  "Punto pass | 5",
+  "Bustina di lega ultima serie | 35",
+  "Bustina di lega serie x | 20",
+  "Promo staff | 0,5",
+  "Maxibusta con promo pre | 5",
+  "Respin | 10"
+].join("\\n");
+
+// ====== Elements ======
+const canvas = document.getElementById('wheel');
+const ctx = canvas.getContext('2d');
+
+const spinBtn = document.getElementById('spinBtn');
+const resetBtn = document.getElementById('resetBtn');
+const staffBtn = document.getElementById('staffBtn');
+
+const pwInput = document.getElementById('pw');
+const unlockBtn = document.getElementById('unlockBtn');
+const lockBtn = document.getElementById('lockBtn');
+
+const cfgTA = document.getElementById('cfg');
+const applyBtn = document.getElementById('applyBtn');
+const presetBtn = document.getElementById('presetBtn');
+const copyLinkBtn = document.getElementById('copyLinkBtn');
+
+const resultEl = document.getElementById('result');
+const nSlicesEl = document.getElementById('nSlices');
+const sumWeightsEl = document.getElementById('sumWeights');
+
+// ====== State ======
+let options = [];
+let angle = 0;
+let spinning = false;
+
+// ====== Helpers ======
+function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
+
+function parseWeight(raw){
+  const norm = String(raw ?? '').trim().replace(',', '.');
+  const w = Number(norm);
+  return w;
+}
+
+function parseCfg(text){
+  const lines = text.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);
+  const out = [];
+  for (const line of lines){
+    const parts = line.split('|').map(x => x.trim());
+    const label = (parts[0] ?? '').slice(0, 60);
+    const weight = parseWeight(parts[1] ?? 1);
+    if (!label) continue;
+    if (!Number.isFinite(weight) || weight <= 0) continue;
+    out.push({ label, weight });
+  }
+  return out;
+}
+
+function weightedPickIndex(opts){
+  const total = opts.reduce((s,o) => s + o.weight, 0);
+  const u = crypto.getRandomValues(new Uint32Array(1))[0] / 2**32;
+  let r = u * total;
+  for (let i=0;i<opts.length;i++){
+    r -= opts[i].weight;
+    if (r < 0) return i;
+  }
+  return opts.length - 1;
+}
+
+function getPalette(n){
+  const colors = [];
+  for (let i=0;i<n;i++){
+    const hue = (i * (360 / n)) % 360;
+    colors.push(`hsl(${hue} 70% 50%)`);
+  }
+  return colors;
+}
+
+function setResult(text){
+  resultEl.style.display = 'block';
+  resultEl.textContent = text;
+}
+
+function updateKpi(){
+  nSlicesEl.textContent = options.length.toString();
+  sumWeightsEl.textContent = options.reduce((s,o)=>s+o.weight,0).toString();
+}
+
+function draw(){
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0,0,w,h);
+
+  const cx = w/2, cy = h/2;
+  const r = Math.min(w,h)*0.44;
+
+  // shadow ring
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.beginPath();
+  ctx.arc(0,0,r+18,0,Math.PI*2);
+  ctx.strokeStyle = 'rgba(0,0,0,.35)';
+  ctx.lineWidth = 40;
+  ctx.stroke();
+  ctx.restore();
+
+  if (!options.length){
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.fillStyle = 'rgba(255,255,255,.08)';
+    ctx.beginPath();
+    ctx.arc(0,0,r,0,Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.6)';
+    ctx.textAlign = 'center';
+    ctx.font = '700 28px system-ui';
+    ctx.fillText('Config mancante', 0, -6);
+    ctx.font = '400 16px system-ui';
+    ctx.fillText('Apri area staff', 0, 22);
+    ctx.restore();
+    return;
+  }
+
+  const n = options.length;
+  const slice = (Math.PI*2)/n;
+  const colors = getPalette(n);
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+
+  for (let i=0;i<n;i++){
+    const start = i*slice;
+    const end = start + slice;
+
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.arc(0,0,r,start,end);
+    ctx.closePath();
+    ctx.fillStyle = colors[i];
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(255,255,255,.65)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // label
+    ctx.save();
+    ctx.rotate(start + slice/2);
+    ctx.translate(r*0.72, 0);
+    ctx.rotate(Math.PI/2);
+    ctx.fillStyle = 'rgba(0,0,0,.85)';
+    ctx.textAlign = 'center';
+    ctx.font = '900 20px system-ui';
+    ctx.fillText(options[i].label, 0, 0);
+    ctx.restore();
+  }
+
+  // center cap
+  ctx.beginPath();
+  ctx.arc(0,0,r*0.18,0,Math.PI*2);
+  ctx.fillStyle = 'rgba(255,255,255,.92)';
+  ctx.fill();
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = 'rgba(0,0,0,.18)';
+  ctx.stroke();
+
+  ctx.restore();
+
+  // outer ring
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.beginPath();
+  ctx.arc(0,0,r,0,Math.PI*2);
+  ctx.lineWidth = 12;
+  ctx.strokeStyle = 'rgba(255,255,255,.18)';
+  ctx.stroke();
+  ctx.restore();
+}
+
+function applyConfigText(text){
+  options = parseCfg(text);
+  updateKpi();
+  resultEl.style.display = 'none';
+  draw();
+}
+
+function loadPreset(){
+  cfgTA.value = PRESET_TEXT;
+  localStorage.setItem('wheel_cfg', PRESET_TEXT);
+  applyConfigText(PRESET_TEXT);
+}
+
+// ====== Shareable link ======
+function currentConfigToUrl(){
+  const payload = btoa(unescape(encodeURIComponent(cfgTA.value)));
+  const url = new URL(location.href);
+  url.searchParams.set('cfg', payload);
+  return url.toString();
+}
+
+function loadConfigFromUrl(){
+  const url = new URL(location.href);
+  const cfg = url.searchParams.get('cfg');
+  if (!cfg) return false;
+  try{
+    const text = decodeURIComponent(escape(atob(cfg)));
+    cfgTA.value = text;
+    localStorage.setItem('wheel_cfg', text);
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+async function copyLink(){
+  const url = currentConfigToUrl();
+  try{
+    await navigator.clipboard.writeText(url);
+    setResult("Link copiato.");
+  }catch(e){
+    const tmp = document.createElement('input');
+    tmp.value = url;
+    document.body.appendChild(tmp);
+    tmp.select();
+    document.execCommand('copy');
+    tmp.remove();
+    setResult("Link copiato (fallback).");
+  }
+}
+
+// ====== Staff lock ======
+async function sha256Hex(str){
+  const data = new TextEncoder().encode(str);
+  const hashBuf = await crypto.subtle.digest('SHA-256', data);
+  const hashArr = Array.from(new Uint8Array(hashBuf));
+  return hashArr.map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function setStaffUnlocked(unlocked){
+  document.body.classList.toggle('staffUnlocked', unlocked);
+  localStorage.setItem('staff_unlocked', unlocked ? '1' : '0');
+  if (!unlocked) pwInput.value = "";
+}
+
+async function tryUnlock(){
+  const pw = pwInput.value ?? "";
+  const h = await sha256Hex(pw);
+  if (h === STAFF_PASSWORD_SHA256_HEX){
+    setStaffUnlocked(true);
+    setResult("Area staff sbloccata.");
+  }else{
+    setResult("Password errata.");
+  }
+}
+
+function lock(){
+  setStaffUnlocked(false);
+  setResult("Area staff bloccata.");
+}
+
+// ====== Spin ======
+function reset(){
+  angle = 0;
+  resultEl.style.display = 'none';
+  draw();
+}
+
+function spin(){
+  if (spinning || options.length < 2) return;
+  spinning = true;
+  spinBtn.disabled = true;
+
+  const n = options.length;
+  const slice = (Math.PI*2)/n;
+
+  const idx = weightedPickIndex(options);
+
+  const center = idx*slice + slice/2;
+  const targetBase = (-Math.PI/2) - center;
+
+  const extraTurns = 6 + Math.floor(crypto.getRandomValues(new Uint32Array(1))[0] % 4); // 6-9
+  const target = targetBase + extraTurns * Math.PI * 2;
+
+  const start = angle;
+  const delta = target - start;
+
+  const duration = 3800;
+  const t0 = performance.now();
+  function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
+
+  function frame(t){
+    const p = clamp((t - t0) / duration, 0, 1);
+    angle = start + delta * easeOutCubic(p);
+    draw();
+    if (p < 1){
+      requestAnimationFrame(frame);
+    }else{
+      spinning = false;
+      spinBtn.disabled = false;
+      setResult("Risultato: " + options[idx].label);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+// ====== Staff button behavior ======
+function openStaff(){
+  // Porta l'utente al pannello staff (seconda card)
+  const cards = document.querySelectorAll('.card');
+  if (cards.length > 1) cards[1].scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// ====== PWA register ======
+if ('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+
+// ====== Wire up ======
+spinBtn.addEventListener('click', spin);
+resetBtn.addEventListener('click', reset);
+staffBtn.addEventListener('click', openStaff);
+
+unlockBtn.addEventListener('click', tryUnlock);
+pwInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') tryUnlock(); });
+lockBtn.addEventListener('click', lock);
+
+applyBtn.addEventListener('click', () => {
+  localStorage.setItem('wheel_cfg', cfgTA.value);
+  applyConfigText(cfgTA.value);
+  setResult("Configurazione applicata.");
+});
+presetBtn.addEventListener('click', () => { loadPreset(); setResult("Preset ripristinato."); });
+copyLinkBtn.addEventListener('click', copyLink);
+
+// ====== Init config ======
+const fromUrl = loadConfigFromUrl();
+if (!fromUrl){
+  const saved = localStorage.getItem('wheel_cfg');
+  if (saved){
+    cfgTA.value = saved;
+    applyConfigText(saved);
+  }else{
+    loadPreset();
+  }
+}else{
+  applyConfigText(cfgTA.value);
+}
+
+// ====== Init staff lock state ======
+const unlocked = localStorage.getItem('staff_unlocked') === '1';
+setStaffUnlocked(unlocked);
+
+draw();
+</script>
+</body>
+</html>
