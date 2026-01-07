@@ -973,13 +973,14 @@ function spin(){
   const center = idx*slice + slice/2;
   const targetBase = (-Math.PI/2) - center;
 
-  const extraTurns = 6 + Math.floor(crypto.getRandomValues(new Uint32Array(1))[0] % 4); // 6-9
+  // increase spin intensity: more extra turns and longer duration
+  const extraTurns = 12 + Math.floor(crypto.getRandomValues(new Uint32Array(1))[0] % 7); // 12-18
   const target = targetBase + extraTurns * Math.PI * 2;
 
   const start = angle;
   const delta = target - start;
 
-  const duration = 4000;
+  const duration = 7000;
   const t0 = performance.now();
   function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
 
