@@ -499,7 +499,9 @@ function findPresetByName(name){
 function loadPresetByName(name){
   const p = findPresetByName(name);
   if (!p) { setResult('Preset non trovato'); return; }
+  console.log('Loading preset', name, p);
   options = parseCfg(p.text);
+  console.log('Parsed options:', options);
   updateKpi();
   renderItemList();
   syncTextarea();

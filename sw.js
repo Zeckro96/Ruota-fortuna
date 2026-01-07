@@ -28,21 +28,34 @@ self.addEventListener("fetch", (event) => {
 
   // Only handle same-origin
   if (url.origin !== self.location.origin) return;
+  // For navigation requests (HTML pages), prefer network first so index.html updates quickly
+  const accept = req.headers.get('Accept') || '';
+  if (req.mode === 'navigate' || accept.indexOf('text/html') !== -1) {
+    event.respondWith(
+      fetch(req).then((res) => {
+        // Update cache with latest HTML
+        if (req.method === 'GET' && res && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then(cache => cache.put(req, copy));
+        }
+        return res;
+      }).catch(() => caches.match('./') || caches.match('/index.html') || new Response('Offline', { status: 503 }))
+    );
+    return;
+  }
 
+  // For other requests, use cache-first strategy
   event.respondWith(
     caches.match(req).then((cached) => {
       if (cached) return cached;
       return fetch(req).then((res) => {
         // Cache any GET same-origin response for resiliency
-        if (req.method === "GET" && res.ok) {
+        if (req.method === "GET" && res && res.ok) {
           const copy = res.clone();
           caches.open(CACHE).then(cache => cache.put(req, copy));
         }
         return res;
-      }).catch(() => {
-        // Return cached version if network fails, or offline response
-        return cached || new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
-      });
+      }).catch(() => cached || new Response('Offline', { status: 503, statusText: 'Service Unavailable' }));
     })
   );
 });
