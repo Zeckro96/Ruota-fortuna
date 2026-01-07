@@ -576,7 +576,7 @@ function parseWeight(raw){
 }
 
 function parseCfg(text){
-  const lines = text.split(/\\r?\\n/).map(x => x.trim()).filter(Boolean);
+  const lines = text.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
   const out = [];
   for (const line of lines){
     const parts = line.split('|').map(x => x.trim());
