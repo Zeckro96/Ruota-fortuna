@@ -487,6 +487,8 @@ function renderPresetsDropdown(){
     opt.textContent = p.name + (i < DEFAULT_PRESETS.length ? ' (default)' : '');
     sel.appendChild(opt);
   });
+  // select first by default
+  if (sel.options.length) sel.value = sel.options[0].value;
 }
 
 function findPresetByName(name){
@@ -1022,7 +1024,9 @@ const deletePresetBtn = document.getElementById('deletePresetBtn');
 
 renderPresetsDropdown();
 
-loadPresetBtn?.addEventListener('click', () => { if (presetSelect?.value) loadPresetByName(presetSelect.value); });
+loadPresetBtn?.addEventListener('click', () => { if (presetSelect?.value) loadPresetByName(presetSelect.value.trim()); });
+// auto-load when selection changes
+presetSelect?.addEventListener('change', (e) => { if (e.target.value) loadPresetByName(e.target.value.trim()); });
 savePresetBtn?.addEventListener('click', saveNewPreset);
 deletePresetBtn?.addEventListener('click', deleteSelectedPreset);
 
