@@ -407,7 +407,15 @@
             </div>
           </div>
 
-          <div class="row">
+          <div style="margin-top:12px; display:flex; gap:8px; align-items:center;">
+            <label for="presetSelect" style="font-size:13px; color:var(--muted); min-width:72px;">Preset</label>
+            <select id="presetSelect" style="flex:1; min-height:40px; border-radius:10px; border:1.5px solid rgba(255,255,255,.12); background:#0e1523; color:var(--text); padding:6px 10px;"></select>
+            <button class="secondary" id="loadPresetBtn" title="Carica preset">Carica</button>
+            <button class="secondary" id="savePresetBtn" title="Salva preset">Salva</button>
+            <button class="secondary" id="deletePresetBtn" title="Elimina preset">Elimina</button>
+          </div>
+
+          <div class="row" style="margin-top:10px;">
             <button class="secondary" id="presetBtn">Ripristina pesi</button>
             <button class="secondary" id="copyLinkBtn">Copia link condivisibile</button>
           </div>
@@ -441,6 +449,89 @@ const PRESET_TEXT = [
   "Maxibusta con promo pre | 5",
   "Respin | 10"
 ].join("\n");
+
+// ====== Preset manager ======
+const DEFAULT_PRESETS = [
+  { name: 'Test A', text: [
+    'TestA - Piccolo premio | 2',
+    'TestA - Medio premio | 8',
+    'TestA - Grande premio | 20'
+  ].join('\n') },
+  { name: 'Test B', text: [
+    'TestB - Entry | 10',
+    'TestB - Bonus | 5',
+    'TestB - Jackpot | 1'
+  ].join('\n') }
+];
+
+function loadPresetsFromStorage(){
+  try{
+    const raw = localStorage.getItem('wheel_presets');
+    const custom = raw ? JSON.parse(raw) : [];
+    return [...DEFAULT_PRESETS, ...custom];
+  }catch(e){ return [...DEFAULT_PRESETS]; }
+}
+
+function savePresetsToStorage(customPresets){
+  localStorage.setItem('wheel_presets', JSON.stringify(customPresets));
+}
+
+function renderPresetsDropdown(){
+  const sel = document.getElementById('presetSelect');
+  if (!sel) return;
+  const list = loadPresetsFromStorage();
+  sel.innerHTML = '';
+  list.forEach((p, i) => {
+    const opt = document.createElement('option');
+    opt.value = p.name;
+    opt.textContent = p.name + (i < DEFAULT_PRESETS.length ? ' (default)' : '');
+    sel.appendChild(opt);
+  });
+}
+
+function findPresetByName(name){
+  const list = loadPresetsFromStorage();
+  return list.find(p => p.name === name) || null;
+}
+
+function loadPresetByName(name){
+  const p = findPresetByName(name);
+  if (!p) { setResult('Preset non trovato'); return; }
+  options = parseCfg(p.text);
+  updateKpi();
+  renderItemList();
+  syncTextarea();
+  localStorage.setItem('wheel_cfg', p.text);
+  draw();
+  setResult('✓ Preset caricato: ' + p.name);
+}
+
+function saveNewPreset(){
+  const sel = document.getElementById('presetSelect');
+  const name = prompt('Nome preset:');
+  if (!name) return;
+  const text = optionsToText();
+  const custom = loadPresetsFromStorage().slice(DEFAULT_PRESETS.length);
+  // overwrite if exists in custom
+  const idx = custom.findIndex(p => p.name === name);
+  if (idx >= 0) custom[idx] = { name, text }; else custom.push({ name, text });
+  savePresetsToStorage(custom);
+  renderPresetsDropdown();
+  setResult('✓ Preset salvato: ' + name);
+}
+
+function deleteSelectedPreset(){
+  const sel = document.getElementById('presetSelect');
+  if (!sel) return;
+  const name = sel.value;
+  // prevent deleting defaults
+  if (DEFAULT_PRESETS.some(p => p.name === name)) { setResult('Impossibile eliminare preset di default'); return; }
+  if (!confirm('Eliminare preset ' + name + '?')) return;
+  const custom = loadPresetsFromStorage().slice(DEFAULT_PRESETS.length).filter(p => p.name !== name);
+  savePresetsToStorage(custom);
+  renderPresetsDropdown();
+  setResult('✓ Preset eliminato: ' + name);
+}
 
 // ====== Elements ======
 const canvas = document.getElementById('wheel');
@@ -923,6 +1014,18 @@ addItemBtn.addEventListener('click', addItem);
 newLabelInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') addItem(); });
 newWeightInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') addItem(); });
 
+// preset select/buttons
+const presetSelect = document.getElementById('presetSelect');
+const loadPresetBtn = document.getElementById('loadPresetBtn');
+const savePresetBtn = document.getElementById('savePresetBtn');
+const deletePresetBtn = document.getElementById('deletePresetBtn');
+
+renderPresetsDropdown();
+
+loadPresetBtn?.addEventListener('click', () => { if (presetSelect?.value) loadPresetByName(presetSelect.value); });
+savePresetBtn?.addEventListener('click', saveNewPreset);
+deletePresetBtn?.addEventListener('click', deleteSelectedPreset);
+
 presetBtn.addEventListener('click', () => { loadPreset(); setResult("✓ Preset ripristinato."); });
 copyLinkBtn.addEventListener('click', copyLink);
 
@@ -936,12 +1039,16 @@ if (!fromUrl){
     loadPreset();
   }
 }else{
+  renderItemList();
   draw();
 }
 
 // ====== Init staff lock state ======
 const unlocked = localStorage.getItem('staff_unlocked') === '1';
 setStaffUnlocked(unlocked);
+
+// Assicurati che la lista sia visibile al caricamento
+renderItemList();
 </script>
 </body>
 </html>
