@@ -39,7 +39,10 @@ self.addEventListener("fetch", (event) => {
           caches.open(CACHE).then(cache => cache.put(req, copy));
         }
         return res;
-      }).catch(() => cached);
+      }).catch(() => {
+        // Return cached version if network fails, or offline response
+        return cached || new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+      });
     })
   );
 });
