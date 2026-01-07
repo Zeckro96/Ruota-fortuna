@@ -196,6 +196,131 @@
       font-size:13px;
     }
 
+    /* Staff panel improvements */
+    .itemList {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+      max-height: 350px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .itemList::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .itemList::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+    }
+
+    .itemList::-webkit-scrollbar-thumb {
+      background: rgba(106, 166, 255, 0.3);
+      border-radius: 10px;
+    }
+
+    .itemList::-webkit-scrollbar-thumb:hover {
+      background: rgba(106, 166, 255, 0.5);
+    }
+
+    .item {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(106, 166, 255, 0.2);
+      transition: all 0.2s ease;
+    }
+
+    .item:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(106, 166, 255, 0.4);
+    }
+
+    .item-color {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .item-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .item-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .item-weight {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .item-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .item-actions button {
+      padding: 6px 10px;
+      min-height: auto;
+      font-size: 12px;
+      flex: 0 0 auto;
+    }
+
+    .addItemForm {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border-radius: 12px;
+      background: rgba(106, 166, 255, 0.08);
+      border: 1px solid rgba(106, 166, 255, 0.2);
+      margin-top: 14px;
+    }
+
+    .formRow {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .formRow input {
+      flex: 1;
+      min-width: 120px;
+      min-height: 40px;
+      border-radius: 10px;
+      border: 1.5px solid rgba(255, 255, 255, 0.15);
+      background: #0e1523;
+      color: var(--text);
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+
+    .formRow input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(106, 166, 255, 0.1);
+    }
+
+    .formRow label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
     /* Miglioramenti per mobile */
     @media (max-width: 640px) {
       .card { padding:16px; }
@@ -262,13 +387,27 @@
           </div>
 
           <p class="muted">
-            Formato: <code>Etichetta | peso</code> (peso &gt; 0). Supporta decimali con virgola o punto.
+            Aggiungi o modifica i settori della ruota. Ogni settore ha un'etichetta e un peso (probabilità).
           </p>
 
-          <textarea id="cfg"></textarea>
+          <div id="itemList" class="itemList"></div>
+
+          <div class="addItemForm">
+            <div style="display: grid; gap: 6px;">
+              <label style="font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;">Nuovo settore</label>
+            </div>
+            <div class="formRow">
+              <div style="flex: 1; min-width: 180px;">
+                <input type="text" id="newLabel" placeholder="Etichetta (es. Bustina)" maxlength="40" />
+              </div>
+              <div style="flex: 0 0 120px;">
+                <input type="number" id="newWeight" placeholder="Peso" min="0.1" step="0.5" value="1" />
+              </div>
+              <button class="secondary" id="addItemBtn" style="flex: 0 0 auto; padding: 8px 14px; min-height: 40px;">+ Aggiungi</button>
+            </div>
+          </div>
 
           <div class="row">
-            <button class="secondary" id="applyBtn">Applica</button>
             <button class="secondary" id="presetBtn">Ripristina pesi</button>
             <button class="secondary" id="copyLinkBtn">Copia link condivisibile</button>
           </div>
@@ -301,7 +440,7 @@ const PRESET_TEXT = [
   "Promo staff | 0,5",
   "Maxibusta con promo pre | 5",
   "Respin | 10"
-].join("\\n");
+].join("\n");
 
 // ====== Elements ======
 const canvas = document.getElementById('wheel');
@@ -315,8 +454,11 @@ const pwInput = document.getElementById('pw');
 const unlockBtn = document.getElementById('unlockBtn');
 const lockBtn = document.getElementById('lockBtn');
 
-const cfgTA = document.getElementById('cfg');
-const applyBtn = document.getElementById('applyBtn');
+const itemListEl = document.getElementById('itemList');
+const newLabelInput = document.getElementById('newLabel');
+const newWeightInput = document.getElementById('newWeight');
+const addItemBtn = document.getElementById('addItemBtn');
+
 const presetBtn = document.getElementById('presetBtn');
 const copyLinkBtn = document.getElementById('copyLinkBtn');
 
@@ -484,17 +626,157 @@ function applyConfigText(text){
   updateKpi();
   resultEl.style.display = 'none';
   draw();
+  renderItemList();
+  syncTextarea();
+}
+
+function syncTextarea(){
+  // Sincronizza la textarea invisibile per il link condivisibile
+  const lines = options.map(o => `${o.label} | ${o.weight}`);
+  const cfgTA = document.createElement('input');
+  cfgTA.id = 'cfg';
+  cfgTA.style.display = 'none';
+  const existing = document.getElementById('cfg');
+  if (existing) existing.remove();
+  cfgTA.value = lines.join('\n');
+  document.body.appendChild(cfgTA);
+}
+
+function renderItemList(){
+  itemListEl.innerHTML = '';
+  const colors = getPalette(options.length || 1);
+  
+  options.forEach((item, idx) => {
+    const div = document.createElement('div');
+    div.className = 'item';
+    
+    const colorSquare = document.createElement('div');
+    colorSquare.className = 'item-color';
+    colorSquare.style.background = colors[idx];
+    
+    const content = document.createElement('div');
+    content.className = 'item-content';
+    
+    const label = document.createElement('div');
+    label.className = 'item-label';
+    label.textContent = item.label;
+    
+    const weight = document.createElement('div');
+    weight.className = 'item-weight';
+    weight.textContent = `Peso: ${item.weight}`;
+    
+    content.appendChild(label);
+    content.appendChild(weight);
+    
+    const actions = document.createElement('div');
+    actions.className = 'item-actions';
+    
+    const editBtn = document.createElement('button');
+    editBtn.className = 'secondary';
+    editBtn.textContent = '✎';
+    editBtn.title = 'Modifica';
+    editBtn.addEventListener('click', () => editItem(idx));
+    
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'secondary';
+    deleteBtn.textContent = '✕';
+    deleteBtn.title = 'Elimina';
+    deleteBtn.addEventListener('click', () => deleteItem(idx));
+    
+    actions.appendChild(editBtn);
+    actions.appendChild(deleteBtn);
+    
+    div.appendChild(colorSquare);
+    div.appendChild(content);
+    div.appendChild(actions);
+    itemListEl.appendChild(div);
+  });
+}
+
+function addItem(){
+  const label = (newLabelInput.value || '').trim().slice(0, 60);
+  const weight = parseFloat(newWeightInput.value) || 1;
+  
+  if (!label) {
+    setResult("⚠️ Inserisci un'etichetta");
+    return;
+  }
+  
+  if (weight <= 0) {
+    setResult("⚠️ Il peso deve essere > 0");
+    return;
+  }
+  
+  options.push({ label, weight });
+  updateKpi();
+  renderItemList();
+  syncTextarea();
+  
+  newLabelInput.value = '';
+  newWeightInput.value = '1';
+  newLabelInput.focus();
+  
+  localStorage.setItem('wheel_cfg', optionsToText());
+  draw();
+  setResult(`✓ Aggiunto: ${label}`);
+}
+
+function editItem(idx){
+  const item = options[idx];
+  const newLabel = prompt('Etichetta:', item.label);
+  if (newLabel === null) return;
+  
+  const trimmedLabel = newLabel.trim().slice(0, 60);
+  if (!trimmedLabel) {
+    setResult("⚠️ Etichetta non può essere vuota");
+    return;
+  }
+  
+  const newWeight = parseFloat(prompt('Peso:', item.weight.toString()));
+  if (isNaN(newWeight) || newWeight <= 0) {
+    setResult("⚠️ Peso deve essere > 0");
+    return;
+  }
+  
+  options[idx] = { label: trimmedLabel, weight: newWeight };
+  updateKpi();
+  renderItemList();
+  syncTextarea();
+  localStorage.setItem('wheel_cfg', optionsToText());
+  draw();
+  setResult(`✓ Modificato: ${trimmedLabel}`);
+}
+
+function deleteItem(idx){
+  if (!confirm('Sei sicuro di voler eliminare questo settore?')) return;
+  
+  const removed = options.splice(idx, 1);
+  updateKpi();
+  renderItemList();
+  syncTextarea();
+  localStorage.setItem('wheel_cfg', optionsToText());
+  draw();
+  setResult(`✓ Eliminato: ${removed[0].label}`);
+}
+
+function optionsToText(){
+  return options.map(o => `${o.label} | ${o.weight}`).join('\n');
 }
 
 function loadPreset(){
-  cfgTA.value = PRESET_TEXT;
+  options = parseCfg(PRESET_TEXT);
+  updateKpi();
+  resultEl.style.display = 'none';
+  renderItemList();
+  syncTextarea();
   localStorage.setItem('wheel_cfg', PRESET_TEXT);
-  applyConfigText(PRESET_TEXT);
+  draw();
 }
 
 // ====== Shareable link ======
 function currentConfigToUrl(){
-  const payload = btoa(unescape(encodeURIComponent(cfgTA.value)));
+  const text = optionsToText();
+  const payload = btoa(unescape(encodeURIComponent(text)));
   const url = new URL(location.href);
   url.searchParams.set('cfg', payload);
   return url.toString();
@@ -506,7 +788,10 @@ function loadConfigFromUrl(){
   if (!cfg) return false;
   try{
     const text = decodeURIComponent(escape(atob(cfg)));
-    cfgTA.value = text;
+    options = parseCfg(text);
+    updateKpi();
+    renderItemList();
+    syncTextarea();
     localStorage.setItem('wheel_cfg', text);
     return true;
   }catch(e){
@@ -634,12 +919,11 @@ unlockBtn.addEventListener('click', tryUnlock);
 pwInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') tryUnlock(); });
 lockBtn.addEventListener('click', lock);
 
-applyBtn.addEventListener('click', () => {
-  localStorage.setItem('wheel_cfg', cfgTA.value);
-  applyConfigText(cfgTA.value);
-  setResult("Configurazione applicata.");
-});
-presetBtn.addEventListener('click', () => { loadPreset(); setResult("Preset ripristinato."); });
+addItemBtn.addEventListener('click', addItem);
+newLabelInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') addItem(); });
+newWeightInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') addItem(); });
+
+presetBtn.addEventListener('click', () => { loadPreset(); setResult("✓ Preset ripristinato."); });
 copyLinkBtn.addEventListener('click', copyLink);
 
 // ====== Init config ======
@@ -647,20 +931,17 @@ const fromUrl = loadConfigFromUrl();
 if (!fromUrl){
   const saved = localStorage.getItem('wheel_cfg');
   if (saved){
-    cfgTA.value = saved;
     applyConfigText(saved);
   }else{
     loadPreset();
   }
 }else{
-  applyConfigText(cfgTA.value);
+  draw();
 }
 
 // ====== Init staff lock state ======
 const unlocked = localStorage.getItem('staff_unlocked') === '1';
 setStaffUnlocked(unlocked);
-
-draw();
 </script>
 </body>
 </html>
