@@ -413,6 +413,7 @@
             <button class="secondary" id="loadPresetBtn" title="Carica preset">Carica</button>
             <button class="secondary" id="savePresetBtn" title="Salva preset">Salva</button>
             <button class="secondary" id="deletePresetBtn" title="Elimina preset">Elimina</button>
+            <button class="secondary" id="clearBtn" title="Azzera ruota">Azzera</button>
           </div>
 
           <div class="row" style="margin-top:10px;">
@@ -499,9 +500,7 @@ function findPresetByName(name){
 function loadPresetByName(name){
   const p = findPresetByName(name);
   if (!p) { setResult('Preset non trovato'); return; }
-  console.log('Loading preset', name, p);
   options = parseCfg(p.text);
-  console.log('Parsed options:', options);
   updateKpi();
   renderItemList();
   syncTextarea();
@@ -535,6 +534,17 @@ function deleteSelectedPreset(){
   savePresetsToStorage(custom);
   renderPresetsDropdown();
   setResult('✓ Preset eliminato: ' + name);
+}
+
+function clearOptions(){
+  if (!confirm('Sei sicuro di voler azzerare tutti gli spicchi?')) return;
+  options = [];
+  localStorage.removeItem('wheel_cfg');
+  updateKpi();
+  renderItemList();
+  syncTextarea();
+  draw();
+  setResult('✓ Ruota azzerata');
 }
 
 // ====== Elements ======
@@ -1023,6 +1033,7 @@ const presetSelect = document.getElementById('presetSelect');
 const loadPresetBtn = document.getElementById('loadPresetBtn');
 const savePresetBtn = document.getElementById('savePresetBtn');
 const deletePresetBtn = document.getElementById('deletePresetBtn');
+const clearBtn = document.getElementById('clearBtn');
 
 renderPresetsDropdown();
 
@@ -1031,6 +1042,7 @@ loadPresetBtn?.addEventListener('click', () => { if (presetSelect?.value) loadPr
 presetSelect?.addEventListener('change', (e) => { if (e.target.value) loadPresetByName(e.target.value.trim()); });
 savePresetBtn?.addEventListener('click', saveNewPreset);
 deletePresetBtn?.addEventListener('click', deleteSelectedPreset);
+clearBtn?.addEventListener('click', clearOptions);
 
 presetBtn.addEventListener('click', () => { loadPreset(); setResult("✓ Preset ripristinato."); });
 copyLinkBtn.addEventListener('click', copyLink);
