@@ -972,13 +972,22 @@ function spin(){
 
   const center = idx*slice + slice/2;
   const targetBase = (-Math.PI/2) - center;
-
   // increase spin intensity: more extra turns and longer duration
+  const TWO_PI = Math.PI * 2;
   const extraTurns = 12 + Math.floor(crypto.getRandomValues(new Uint32Array(1))[0] % 7); // 12-18
-  const target = targetBase + extraTurns * Math.PI * 2;
 
-  const start = angle;
+  // normalize start angle so subsequent spins behave like the first
+  let start = angle % TWO_PI;
+  if (start < 0) start += TWO_PI;
+
+  // base target (so selected slice lands under pointer), plus extra full turns
+  let target = targetBase + extraTurns * TWO_PI;
+  // ensure target is strictly greater than start so motion is always forward and consistent
+  while (target <= start) target += TWO_PI;
+
   const delta = target - start;
+  // reflect normalized start in global angle so draw() uses it immediately
+  angle = start;
 
   const duration = 7000;
   const t0 = performance.now();
@@ -991,6 +1000,8 @@ function spin(){
     if (p < 1){
       requestAnimationFrame(frame);
     }else{
+      // normalize stored angle to keep numbers small for next spin
+      angle = target % TWO_PI;
       spinning = false;
       spinBtn.disabled = false;
       // Feedback aggiunto: delay per il risultato
