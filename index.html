@@ -363,7 +363,6 @@
       <div class="card">
         <div class="topBar">
           <h1>Ruota Cinnabar Lab</h1>
-          <button class="secondary smallBtn" id="staffBtn" title="Area staff">Staff</button>
         </div>
 
         <div class="wheelWrap">
@@ -378,47 +377,33 @@
 
         <div class="btnRow">
           <button id="spinBtn">GIRA</button>
-          <button class="secondary" id="resetBtn">Reset</button>
         </div>
-
         <div id="result" class="result"></div>
-
-        <div class="kpi">
-          <div class="box"><b>Settori (visivi)</b><span id="nSlices">–</span></div>
-          <div class="box"><b>Somma pesi</b><span id="sumWeights">–</span></div>
-        </div>
-
-        <p class="muted" style="margin:10px 0 0">
-          Settori tutti uguali. Probabilità gestita dai pesi (weight).
-        </p>
       </div>
 
       <!-- STAFF PANEL (locked by default) -->
       <div class="card">
+        <h1>Area staff</h1>
         <div class="publicOnly">
-          <h1>Area staff (bloccata)</h1>
-          <p class="muted">
-            Inserisci la password per modificare i pesi. Per eventi live è consigliato lasciare la ruota in modalità pubblica.
-          </p>
           <div class="row">
             <input id="pw" type="password" placeholder="Password staff" autocomplete="current-password" />
             <button class="secondary" id="unlockBtn">Sblocca</button>
           </div>
-          <p class="muted">
-            Nota: la protezione è lato-client (serve per evitare modifiche accidentali, non per sicurezza “militare”).
-          </p>
-          <p class="muted"><span class="pill" id="installHint">Suggerimento: puoi installarla come app (PWA).</span></p>
         </div>
 
         <div class="staffOnly">
           <div class="topBar">
-            <h1>Area staff</h1>
             <button class="secondary smallBtn" id="lockBtn">Blocca</button>
           </div>
 
           <p class="muted">
             Aggiungi o modifica i settori della ruota. Ogni settore ha un'etichetta e un peso (probabilità).
           </p>
+
+          <div class="kpi" style="margin-top:12px;">
+            <div class="box"><b>Settori (visivi)</b><span id="nSlices">–</span></div>
+            <div class="box"><b>Somma pesi</b><span id="sumWeights">–</span></div>
+          </div>
 
           <div id="itemList" class="itemList"></div>
 
@@ -609,6 +594,7 @@ const closeWinBtn = document.getElementById('closeWinBtn');
 let options = [];
 let angle = 0;
 let spinning = false;
+let resultHideTimer = null;
 
 // ====== Helpers ======
 function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
@@ -1083,6 +1069,11 @@ async function tryUnlock(){
 function lock(){
   setStaffUnlocked(false);
   setResult("Area staff bloccata.");
+  if (resultHideTimer) clearTimeout(resultHideTimer);
+  resultHideTimer = setTimeout(() => {
+    resultEl.style.display = 'none';
+    resultHideTimer = null;
+  }, 5000);
 }
 
 // ====== Spin ======
@@ -1162,8 +1153,8 @@ if ('serviceWorker' in navigator){
 
 // ====== Wire up ======
 spinBtn.addEventListener('click', spin);
-resetBtn.addEventListener('click', reset);
-staffBtn.addEventListener('click', openStaff);
+staffBtn?.addEventListener('click', openStaff);
+resetBtn?.addEventListener('click', reset);
 
 unlockBtn.addEventListener('click', tryUnlock);
 pwInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') tryUnlock(); });
